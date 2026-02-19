@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ブラックジャック - もっちカジノ</title>
+  <style>
+    body { font-family: sans-serif; background-color: #1a5e20; color: white; text-align: center; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background: #2e7d32; padding: 20px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    .card-area { min-height: 110px; margin: 10px auto; padding: 10px; border: 2px dashed #4caf50; border-radius: 10px; display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; }
+    .card { background: white; width: 60px; height: 90px; border-radius: 8px; font-weight: bold; font-size: 1.5em; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); }
+    .card.hidden { background: #b71c1c; background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.1) 10px, rgba(0,0,0,0.1) 20px); border: 2px solid white; color: transparent; }
+    .red { color: #e74c3c; }
+    .black { color: #2c3e50; }
+    .controls { margin-top: 20px; }
+    button { padding: 12px 25px; margin: 5px; font-size: 1.1em; cursor: pointer; border-radius: 5px; border: none; font-weight: bold; transition: 0.2s; }
+    .btn-start { background: #f1c40f; color: #333; }
+    .btn-action { background: #3498db; color: white; }
+    .btn-action:hover { background: #2980b9; }
+    button:disabled { background: #7f8c8d !important; color: #bdc3c7 !important; cursor: not-allowed; }
+    #msg-box { font-size: 1.2em; font-weight: bold; margin: 15px 0; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 5px; min-height: 1.5em; }
+    .score-badge { background: #ffca28; color: #333; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin-left: 10px; display: inline-block; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🃏 ブラックジャック (vs ディーラー)</h2>
+    <p>参加費: 300 もっち / 勝利報酬: 600 もっち</p>
+    <p>所持金: <span id="display-points" style="color: #f1c40f; font-weight: bold; font-size: 1.2em;">---</span> もっち</p>
+
+    <div style="margin-top: 20px; text-align: left;">
+      ディーラーの手札 <span id="dealer-score-badge" class="score-badge" style="display:none;"></span>
+    </div>
+    <div id="dealer-cards" class="card-area"></div>
+
+    <div id="msg-box">「ゲーム開始」を押してください</div>
+
+    <div style="text-align: left;">
+      あなたの手札 <span id="player-score-badge" class="score-badge" style="display:none;"></span>
+    </div>
+    <div id="player-cards" class="card-area"></div>
+
+    <div class="controls">
+      <button id="btn-start" class="btn-start" onclick="startGame()">ゲーム開始 (300消費)</button>
+      <button id="btn-hit" class="btn-action" onclick="hit()" style="display:none;">ヒット (もう1枚)</button>
+      <button id="btn-stand" class="btn-action" onclick="stand()" style="display:none;">スタンド (勝負)</button>
+    </div>
+    <br><a href="../index.html" style="color: #a5d6a7; text-decoration: none;">🔙 マイページに戻る</a>
+  </div>
+
+  <script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyOmbY7H3r9MIDMsH4m7BifWwIknowmiE9nD44wXZVFrffQYOPr_OSvaejnyQvAdVtZNw/exec";
+    const COST = 300;
+    const REWARD = 600;
+
+    let deck = [], playerHand = [], dealerHand = [];
+    let currentPoints = parseInt(localStorage.getItem('userPoints'));
+    document.getElementById('display-points').innerText = currentPoints;
+
+    function createDeck() {
+      const suits = ['♠', '♥', '♦', '♣'];
+      const values = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+      deck = [];
+      for(let s of suits) {
+        for(let v of values) {
+          deck.push({ suit: s, value: v, isRed: (s === '♥' || s === '♦') });
+        }
+      }
+      deck.sort(() => Math.random() - 0.5); // シャッフル
+    }
+
+    // スコア計算（Aは11か1、有利な方で計算）
+    function calculateScore(hand) {
+      let score = 0;
+      let aces = 0;
+      for(let card of hand) {
+        if(card.value === 'A') {
+          score += 11;
+          aces += 1;
+        } else if(['J','Q','K'].includes(card.value)) {
+          score += 10;
+        } else {
+          score += parseInt(card.value);
+        }
+      }
+      while(score > 21 && aces > 0) {
+        score -= 10;
+        aces -= 1;
+      }
+      return score;
+    }
+
+    // カードを画面に描画する
+    function renderCards(hideDealerCard) {
+      const pArea = document.getElementById('player-cards');
+      pArea.innerHTML = playerHand.map(c => 
+        `<div class="card ${c.isRed ? 'red' : 'black'}"><div>${c.suit}</div><div>${c.value}</div></div>`
+      ).join('');
+      
+      document.getElementById('player-score-badge').style.display = 'inline-block';
+      document.getElementById('player-score-badge').innerText = calculateScore(playerHand) + "点";
+
+      const dArea = document.getElementById('dealer-cards');
+      if (hideDealerCard) {
+        // 1枚目は見せ、2枚目以降（初期状態）は裏向き
+        dArea.innerHTML = 
+          `<div class="card ${dealerHand[0].isRed ? 'red' : 'black'}"><div>${dealerHand[0].suit}</div><div>${dealerHand[0].value}</div></div>` +
+          `<div class="card hidden"></div>`;
+        document.getElementById('dealer-score-badge').style.display = 'none';
+      } else {
+        dArea.innerHTML = dealerHand.map(c => 
+          `<div class="card ${c.isRed ? 'red' : 'black'}"><div>${c.suit}</div><div>${c.value}</div></div>`
+        ).join('');
+        document.getElementById('dealer-score-badge').style.display = 'inline-block';
+        document.getElementById('dealer-score-badge').innerText = calculateScore(dealerHand) + "点";
+      }
+    }
+
+    function showMsg(msg) {
+      document.getElementById('msg-box').innerText = msg;
+    }
+
+    async function startGame() {
+      if(currentPoints < COST) { alert("もっちが足りません！"); return; }
+      
+      currentPoints -= COST;
+      document.getElementById('display-points').innerText = currentPoints;
+
+      document.getElementById('btn-start').style.display = 'none';
+      document.getElementById('btn-hit').style.display = 'inline-block';
+      document.getElementById('btn-stand').style.display = 'inline-block';
+      document.getElementById('btn-hit').disabled = false;
+      document.getElementById('btn-stand').disabled = false;
+
+      createDeck();
+      playerHand = [deck.pop(), deck.pop()];
+      dealerHand = [deck.pop(), deck.pop()];
+
+      renderCards(true);
+      
+      const pScore = calculateScore(playerHand);
+      if(pScore === 21) {
+        showMsg("ブラックジャック！あなたのターン終了です。");
+        document.getElementById('btn-hit').disabled = true;
+        document.getElementById('btn-stand').disabled = true;
+        setTimeout(dealerTurn, 1000);
+      } else {
+        showMsg("あなたのターンです。「ヒット」か「スタンド」を選んでください。");
+      }
+    }
+
+    function hit() {
+      playerHand.push(deck.pop());
+      renderCards(true);
+      const pScore = calculateScore(playerHand);
+      
+      if(pScore > 21) {
+        document.getElementById('btn-hit').disabled = true;
+        document.getElementById('btn-stand').disabled = true;
+        showMsg("💥 バースト！21点を超えました...");
+        setTimeout(() => endGame(false, false, "バーストによる敗北"), 1000);
+      } else if(pScore === 21) {
+        document.getElementById('btn-hit').disabled = true;
+        showMsg("21点です！スタンドしてください。");
+      }
+    }
+
+    function stand() {
+      document.getElementById('btn-hit').disabled = true;
+      document.getElementById('btn-stand').disabled = true;
+      showMsg("スタンドしました。ディーラーのターンです...");
+      setTimeout(dealerTurn, 1000);
+    }
+
+    // ディーラーのAIロジック（17以上になるまで引く）
+    async function dealerTurn() {
+      renderCards(false); // 伏せカードをオープン
+      showMsg("ディーラーが伏せカードをオープンしました。");
+      await new Promise(r => setTimeout(r, 1500));
+
+      while(calculateScore(dealerHand) < 17) {
+        showMsg("ディーラーのスコアが17未満のため、カードを引きます...");
+        await new Promise(r => setTimeout(r, 1500));
+        dealerHand.push(deck.pop());
+        renderCards(false);
+      }
+
+      const dScore = calculateScore(dealerHand);
+      if(dScore > 21) {
+        showMsg("ディーラーがバーストしました！");
+      } else {
+        showMsg(`ディーラーは ${dScore} 点でスタンドしました。`);
+      }
+      
+      await new Promise(r => setTimeout(r, 1500));
+      judgeResult();
+    }
+
+    function judgeResult() {
+      const pScore = calculateScore(playerHand);
+      const dScore = calculateScore(dealerHand);
+
+      if(dScore > 21 || pScore > dScore) {
+        endGame(true, false, `あなたの勝ち！ (${pScore}点 vs ${dScore > 21 ? 'バースト' : dScore + '点'})`);
+      } else if(pScore === dScore) {
+        endGame(false, true, `引き分け (共に${pScore}点)`);
+      } else {
+        endGame(false, false, `ディーラーの勝ち... (${pScore}点 vs ${dScore}点)`);
+      }
+    }
+
+    async function endGame(isWin, isDraw, resultText) {
+      if(isWin) {
+        currentPoints += REWARD;
+        showMsg(`🎉 ${resultText} \n ${REWARD} もっち獲得！`);
+      } else if(isDraw) {
+        currentPoints += COST; // 返金
+        showMsg(`🤝 ${resultText} \n 掛け金が返還されました。`);
+      } else {
+        showMsg(`💀 ${resultText} \n もっちを失いました。`);
+      }
+
+      document.getElementById('btn-hit').style.display = 'none';
+      document.getElementById('btn-stand').style.display = 'none';
+      document.getElementById('btn-start').style.display = 'inline-block';
+      document.getElementById('btn-start').innerText = "もう一度遊ぶ";
+
+      // GAS(スプレッドシート)のデータベースを更新
+      try {
+        await fetch(GAS_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'updatePoints', id: localStorage.getItem('userId'), newPoints: currentPoints }),
+          headers: { 'Content-Type': 'text/plain' }
+        });
+        localStorage.setItem('userPoints', currentPoints);
+        document.getElementById('display-points').innerText = currentPoints;
+      } catch(e) {
+        console.error("通信エラー", e);
+      }
+    }
+  </script>
+</body>
+</html>
