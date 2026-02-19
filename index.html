@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-width=1.0">
+  <title>もっちカジノ - メインページ</title>
+  <style>
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background-color: #f4f7f6;
+      color: #333;
+      text-align: center;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #2c3e50;
+    }
+    .points {
+      font-size: 1.5em;
+      font-weight: bold;
+      color: #e74c3c;
+    }
+    ul.game-list {
+      list-style: none;
+      padding: 0;
+    }
+    ul.game-list li {
+      margin: 15px 0;
+    }
+    ul.game-list a {
+      display: inline-block;
+      text-decoration: none;
+      background-color: #3498db;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 5px;
+      width: 80%;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+    ul.game-list a:hover {
+      background-color: #2980b9;
+    }
+    button {
+      background-color: #95a5a6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+    button:hover {
+      background-color: #7f8c8d;
+    }
+    .explanation {
+      text-align: left;
+      background: #eaf2f8;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div id="logged-out-view">
+      <h1>💰 もっちカジノへようこそ！</h1>
+      
+      <div class="explanation">
+        <h3>もっちカジノとは？</h3>
+        <p>ここでは仮想通貨<strong>「もっち」</strong>を使って、様々な賭け事（ゲーム）を楽しむことができます。</p>
+        <p>新規登録すると、なんと初期ポイントとして<strong>10,000もっち</strong>をプレゼント！</p>
+        <p>ゲームに勝ってポイントを増やし、大富豪を目指しましょう。</p>
+      </div>
+
+      <p>さっそく始めましょう！</p>
+      <a href="register.html" style="display:inline-block; margin:10px; padding:10px 20px; background:#2ecc71; color:white; text-decoration:none; border-radius:5px;">新規登録</a>
+      <a href="login.html" style="display:inline-block; margin:10px; padding:10px 20px; background:#f39c12; color:white; text-decoration:none; border-radius:5px;">ログイン</a>
+    </div>
+
+    <div id="logged-in-view" style="display: none;">
+      <h1>🏠 マイページ</h1>
+      <p>ようこそ、<strong id="user-name" style="font-size: 1.2em;"></strong> さん！</p>
+      
+      <div style="background: #fcf3cf; padding: 20px; border-radius: 10px; margin: 20px 0;">
+        <p style="margin: 0;">現在の所持ポイント</p>
+        <p class="points"><span id="user-points"></span> もっち</p>
+      </div>
+      
+      <h3>🎮 ゲームで遊ぶ</h3>
+      <p>遊びたいゲームを選んでください（遊ぶたびにポイントを消費します）</p>
+      <ul class="game-list">
+        <li><a href="games/cointoss.html">🪙 コイントス (参加費: 100もっち)</a></li>
+        <li><a href="games/dice.html">🎲 サイコロ (参加費: 200もっち)</a></li>
+        <li><a href="games/blackjack.html">🃏 ブラックジャック (参加費: 300もっち)</a></li>
+        <li><a href="games/poker.html">♠️ ポーカー (参加費: 500もっち)</a></li>
+        <li><a href="games/russian_roulette.html">🔫 ロシアンルーレット (参加費: 500もっち)</a></li>
+      </ul>
+
+      <p style="font-size: 0.9em; margin-top: 30px;">
+        <a href="#" onclick="alert('アカウント情報変更機能は準備中です！')">アカウント情報の変更</a>
+      </p>
+
+      <button onclick="logout()">ログアウト</button>
+    </div>
+  </div>
+
+  <script>
+    // ページ読み込み時に実行される処理
+    window.onload = function() {
+      // localStorageからユーザーIDを取得して、ログインしているか判定
+      const userId = localStorage.getItem('userId');
+      
+      if (userId) {
+        // ログインしている場合
+        document.getElementById('logged-out-view').style.display = 'none';
+        document.getElementById('logged-in-view').style.display = 'block';
+        
+        // 保存されているユーザー名とポイントを表示
+        document.getElementById('user-name').innerText = localStorage.getItem('userName');
+        document.getElementById('user-points').innerText = localStorage.getItem('userPoints');
+      } else {
+        // ログインしていない場合（デフォルトのまま）
+        document.getElementById('logged-out-view').style.display = 'block';
+        document.getElementById('logged-in-view').style.display = 'none';
+      }
+    };
+
+    // ログアウト処理
+    function logout() {
+      if(confirm("ログアウトしますか？")) {
+        localStorage.clear(); // 保存されているデータをすべて消去
+        location.reload();    // ページを再読み込みしてログアウト状態にする
+      }
+    }
+  </script>
+
+</body>
+</html>
