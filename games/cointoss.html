@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>コイントス - もっちカジノ</title>
+</head>
+<body>
+  <h2>コイントス</h2>
+  <p>参加費: 100 もっち / 勝利報酬: 200 もっち</p>
+  <p>あなたの所持もっち: <strong id="display-points">---</strong></p>
+
+  <div id="game-area">
+    <p>表か裏か、どちらに賭けますか？</p>
+    <button onclick="playGame('表')">表に賭ける</button>
+    <button onclick="playGame('裏')">裏に賭ける</button>
+  </div>
+
+  <div id="result-area" style="margin-top: 20px; font-weight: bold; font-size: 1.2em;"></div>
+
+  <p><a href="../index.html">マイページに戻る</a></p>
+
+  <script>
+    const GAS_URL = "あなたのGAS_WEBアプリのURL";
+    const COST = 100;
+    const REWARD = 200;
+    
+    // ページ読み込み時に所持ポイントを表示
+    let currentPoints = parseInt(localStorage.getItem('userPoints'));
+    document.getElementById('display-points').innerText = currentPoints;
+
+    async function playGame(bet) {
+      if (currentPoints < COST) {
+        alert("もっちが足りません！");
+        return;
+      }
+
+      // ポイントを消費
+      currentPoints -= COST;
+      document.getElementById('display-points').innerText = currentPoints;
+      
+      const coins = ['表', '裏'];
+      const result = coins[Math.floor(Math.random() * coins.length)];
+      
+      let message = `結果は「${result}」！\n`;
+      
+      if (bet === result) {
+        message += `大正解！ ${REWARD} もっち獲得！`;
+        currentPoints += REWARD;
+      } else {
+        message += `残念... 没収です。`;
+      }
+      
+      document.getElementById('result-area').innerText = message;
+      document.getElementById('display-points').innerText = currentPoints;
+
+      // ローカルストレージを更新
+      localStorage.setItem('userPoints', currentPoints);
+
+      // GAS(スプレッドシート)のデータベースも更新
+      await fetch(GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'updatePoints',
+          id: localStorage.getItem('userId'),
+          newPoints: currentPoints
+        }),
+        headers: { 'Content-Type': 'text/plain' }
+      });
+    }
+  </script>
+</body>
+</html>
