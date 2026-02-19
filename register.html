@@ -2,28 +2,42 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-width=1.0">
   <title>新規登録 - もっちカジノ</title>
+  <style>
+    body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f7f6; color: #333; text-align: center; padding: 20px; }
+    .container { max-width: 400px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    h2 { color: #2c3e50; }
+    input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 1em; }
+    button { background-color: #2ecc71; color: white; border: none; padding: 12px 20px; cursor: pointer; border-radius: 5px; font-weight: bold; width: 90%; margin-top: 15px; font-size: 1.1em; transition: 0.3s; }
+    button:hover { background-color: #27ae60; }
+    button:disabled { background-color: #95a5a6; cursor: not-allowed; }
+    .link { margin-top: 20px; display: block; color: #3498db; text-decoration: none; }
+    .link:hover { text-decoration: underline; }
+  </style>
 </head>
 <body>
-  <h2>新規アカウント登録</h2>
-  <p>初期ポイントとして10,000もっちをプレゼント！</p>
-  
-  <div>
-    <input type="text" id="reg-id" placeholder="ユーザーID (半角英数)"><br><br>
-    <input type="text" id="reg-name" placeholder="表示名 (例: もっち太郎)"><br><br>
-    <input type="email" id="reg-email" placeholder="メールアドレス"><br><br>
-    <input type="password" id="reg-pass" placeholder="パスワード"><br><br>
-    <button onclick="registerUser()">登録して確認メールを送信</button>
+  <div class="container">
+    <h2>新規アカウント登録</h2>
+    <p>初期ポイント: <strong style="color:#e74c3c;">10,000 もっち</strong> プレゼント！</p>
+    
+    <div>
+      <input type="text" id="reg-id" placeholder="ユーザーID (半角英数)">
+      <input type="text" id="reg-name" placeholder="表示名 (例: もっち太郎)">
+      <input type="email" id="reg-email" placeholder="メールアドレス">
+      <input type="password" id="reg-pass" placeholder="パスワード">
+      <button id="reg-btn" onclick="registerUser()">登録して確認メールを送信</button>
+    </div>
+
+    <a href="login.html" class="link">すでにアカウントをお持ちの方はこちら</a>
   </div>
 
-  <p><a href="login.html">すでにアカウントをお持ちの方はこちら</a></p>
-
   <script>
-    // ★前回のステップで取得したGASのURLに書き換えてください
+    // ★必ず正しいウェブアプリのURL（/exec で終わるもの）に書き換えてください
     const GAS_URL = "https://script.google.com/macros/s/AKfycbyOmbY7H3r9MIDMsH4m7BifWwIknowmiE9nD44wXZVFrffQYOPr_OSvaejnyQvAdVtZNw/exec";
 
     async function registerUser() {
-      const btn = document.querySelector('button');
+      const btn = document.getElementById('reg-btn');
       btn.disabled = true;
       btn.innerText = "通信中...";
 
@@ -52,7 +66,9 @@
           btn.innerText = "登録して確認メールを送信";
         }
       } catch (e) {
-        alert("通信エラーです。");
+        alert("通信エラーです。URLが正しいか確認してください。");
+        btn.disabled = false;
+        btn.innerText = "登録して確認メールを送信";
       }
     }
   </script>
