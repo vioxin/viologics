@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ポーカー - もっちカジノ</title>
+  <style>
+    body { font-family: sans-serif; background-color: #0b5345; color: white; text-align: center; padding: 20px; }
+    .container { max-width: 700px; margin: 0 auto; background: #148f77; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    .card { display: inline-block; background: white; color: black; width: 60px; height: 90px; margin: 5px; border-radius: 8px; font-weight: bold; font-size: 1.5em; line-height: 90px; cursor: pointer; border: 3px solid white; user-select: none; transition: 0.2s; position: relative;}
+    .card.selected { border-color: #e74c3c; transform: translateY(-10px); }
+    .card.hidden { background: #2c3e50; color: #2c3e50; border-color: #fff; }
+    .red { color: #e74c3c; }
+    .black { color: #2c3e50; }
+    .controls { margin-top: 20px; }
+    button { padding: 12px 25px; font-size: 1.1em; cursor: pointer; border-radius: 5px; border: none; font-weight: bold; }
+    .btn-play { background: #f1c40f; color: #333; }
+    .btn-exchange { background: #3498db; color: white; }
+    #msg { font-size: 1.2em; font-weight: bold; margin: 15px 0; min-height: 1.5em;}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>♠️ 5ドローポーカー (vs CPU)</h2>
+    <p>参加費: 500もっち / 所持金: <span id="display-points">---</span> もっち</p>
+
+    <div>CPUの手札: <span id="cpu-hand-name"></span></div>
+    <div id="cpu-cards" style="min-height: 110px;"></div>
+
+    <div id="msg">ゲーム開始を押してください</div>
+
+    <div>あなたの手札: <span id="player-hand-name"></span></div>
+    <div id="player-cards" style="min-height: 110px;"></div>
+
+    <div class="controls">
+      <button id="btn-start" class="btn-play" onclick="startGame()">ゲーム開始 (500消費)</button>
+      <button id="btn-exchange" class="btn-exchange" onclick="exchangeCards()" style="display:none;">選択したカードを交換する</button>
+    </div>
+    <br><a href="../index.html" style="color: #a3e4d7;">🔙 マイページに戻る</a>
+  </div>
+
+  <script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyOmbY7H3r9MIDMsH4m7BifWwIknowmiE9nD44wXZVFrffQYOPr_OSvaejnyQvAdVtZNw/exec";
+    let currentPoints = parseInt(localStorage.getItem('userPoints')) || 10000;
+    document.getElementById('display-points').innerText = currentPoints;
+
+    let deck = [], playerHand = [], cpuHand = [];
+    const suits = ['♠', '♥', '♦', '♣'];
+    const values = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+    
+    // 役の強さと配当倍率
+    const handRanks = ["ハイカード", "ワンペア", "ツーペア", "スリーカード", "ストレート", "フラッシュ", "フルハウス", "フォーカード", "ストレートフラッシュ", "ロイヤルストレートフラッシュ"];
+    const payouts = [0, 2, 3, 5, 10, 15, 20, 50, 100, 500]; // ワンペアで2倍(1000戻る)など
+
+    function createDeck() {
+      deck = [];
+      for(let s of suits) {
+        for(let i=0; i<values.length; i++) {
+          deck.push({ suit: s, valueStr: values[i], value: i + 2, isRed: (s==='♥'||s==='♦') });
+        }
+      }
+      deck.sort(() => Math.random() - 0.5);
+    }
+
+    async function startGame() {
+      if(currentPoints < 500) { alert("もっちが足りません"); return; }
+      currentPoints -= 500;
+      updatePoints();
+
+      createDeck();
+      playerHand = []; cpuHand = [];
+      for(let i=0; i<5; i++) {
+        playerHand.push({ card: deck.pop(), selected: false });
+        cpuHand.push({ card: deck.pop(), selected: false });
+      }
+
+      document.getElementById('btn-start').style.display = 'none';
+      document.getElementById('btn-exchange').style.display = 'inline-block';
+      document.getElementById('msg').innerText = "交換したいカードをタップして選んでください。";
+      document.getElementById('cpu-hand-name').innerText = "";
+      
+      renderHands(false); // CPUの手札は裏向き
+    }
+
+    function renderHands(revealCpu) {
+      const pArea = document.getElementById('player-cards');
+      pArea.innerHTML = '';
+      playerHand.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = `card ${item.card.isRed ? 'red' : 'black'} ${item.selected ? 'selected' : ''}`;
+        div.innerHTML = `${item.card.suit}<br>${item.card.valueStr}`;
+        div.onclick = () => { item.selected = !item.selected; renderHands(revealCpu); };
+        pArea.appendChild(div);
+      });
+      document.getElementById('player-hand-name').innerText = evaluateHand(playerHand.map(i=>i.card)).name;
+
+      const cArea = document.getElementById('cpu-cards');
+      cArea.innerHTML = '';
+      cpuHand.forEach(item => {
+        const div = document.createElement('div');
+        if(revealCpu) {
+          div.className = `card ${item.card.isRed ? 'red' : 'black'}`;
+          div.innerHTML = `${item.card.suit}<br>${item.card.valueStr}`;
+        } else {
+          div.className = `card hidden`;
+          div.innerHTML = `🂠`;
+        }
+        cArea.appendChild(div);
+      });
+    }
+
+    async function exchangeCards() {
+      document.getElementById('btn-exchange').style.display = 'none';
+      document.getElementById('msg').innerText = "カード交換中...";
+
+      // プレイヤーの交換
+      playerHand = playerHand.map(item => item.selected ? {card: deck.pop(), selected: false} : item);
+      renderHands(false);
+
+      await new Promise(r => setTimeout(r, 1000));
+
+      // CPUのAI思考（超シンプル：ペアなどの重複数字を残し、バラバラなら一番大きい数字だけ残して全取っ替え）
+      let valCounts = {};
+      cpuHand.forEach(item => valCounts[item.card.value] = (valCounts[item.card.value] || 0) + 1);
+      let keepValues = Object.keys(valCounts).filter(k => valCounts[k] >= 2).map(Number);
+      
+      if(keepValues.length === 0) {
+        // ペアが無い場合、一番強いカード1枚だけ残す
+        let maxVal = Math.max(...cpuHand.map(i => i.card.value));
+        keepValues = [maxVal];
+      }
+
+      cpuHand = cpuHand.map(item => keepValues.includes(item.card.value) ? item : {card: deck.pop(), selected: false});
+      
+      document.getElementById('msg').innerText = "CPUがカードを交換しました。いざ勝負！";
+      await new Promise(r => setTimeout(r, 1500));
+
+      judgeResult();
+    }
+
+    async function judgeResult() {
+      renderHands(true); // CPUの手札をオープン
+      
+      const pEval = evaluateHand(playerHand.map(i=>i.card));
+      const cEval = evaluateHand(cpuHand.map(i=>i.card));
+      
+      document.getElementById('player-hand-name').innerText = pEval.name;
+      document.getElementById('cpu-hand-name').innerText = cEval.name;
+
+      let msg = "";
+      let win = false;
+      let draw = false;
+
+      // スコアで勝敗判定
+      if (pEval.score > cEval.score) win = true;
+      else if (pEval.score === cEval.score) draw = true;
+
+      if (win) {
+        let reward = 500 * payouts[pEval.rankIndex]; // 役に応じた倍率
+        if (reward === 0) reward = 500; // ハイカード勝ちでも最低限掛け金は戻る仕様に
+        currentPoints += reward;
+        msg = `🎉 あなたの勝ち！ ${pEval.name}で ${reward}もっち獲得！`;
+      } else if (draw) {
+        currentPoints += 500; // 引き分けは返金
+        msg = "🤝 引き分け。もっちが返還されました。";
+      } else {
+        msg = `💀 負け... CPUの${cEval.name}の勝利です。`;
+      }
+
+      document.getElementById('msg').innerText = msg;
+      document.getElementById('btn-start').style.display = 'inline-block';
+      document.getElementById('btn-start').innerText = "もう一度遊ぶ";
+
+      // GAS通信
+      await fetch(GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'updatePoints', id: localStorage.getItem('userId'), newPoints: currentPoints }),
+        headers: { 'Content-Type': 'text/plain' }
+      });
+      updatePoints();
+    }
+
+    function updatePoints() {
+      localStorage.setItem('userPoints', currentPoints);
+      document.getElementById('display-points').innerText = currentPoints;
+    }
+
+    // --- 役判定ロジック (かなり長くなるのでシンプルに実装) ---
+    function evaluateHand(cards) {
+      cards.sort((a,b) => b.value - a.value); // 降順ソート
+      const isFlush = cards.every(c => c.suit === cards[0].suit);
+      const isStraight = cards.every((c, i) => i === 0 || cards[i-1].value - c.value === 1);
+      
+      let counts = {};
+      cards.forEach(c => counts[c.value] = (counts[c.value] || 0) + 1);
+      let pairs = Object.values(counts).filter(v => v === 2).length;
+      let three = Object.values(counts).filter(v => v === 3).length;
+      let four = Object.values(counts).filter(v => v === 4).length;
+
+      let rankIndex = 0;
+      if(isFlush && isStraight && cards[0].value === 14) rankIndex = 9; // ロイヤル
+      else if(isFlush && isStraight) rankIndex = 8;
+      else if(four === 1) rankIndex = 7;
+      else if(three === 1 && pairs === 1) rankIndex = 6; // フルハウス
+      else if(isFlush) rankIndex = 5;
+      else if(isStraight) rankIndex = 4;
+      else if(three === 1) rankIndex = 3;
+      else if(pairs === 2) rankIndex = 2;
+      else if(pairs === 1) rankIndex = 1;
+      
+      // 同役だった場合の判定用スコア（強さのインデックスを最上位に、その下にカードの値を足す）
+      let score = rankIndex * 1000000;
+      // 役を構成するカードを重み付けしてスコア化（簡易版）
+      cards.forEach((c, i) => score += c.value * Math.pow(10, 4 - i));
+
+      return { name: handRanks[rankIndex], rankIndex: rankIndex, score: score };
+    }
+  </script>
+</body>
+</html>
