@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ロシアンルーレット - もっちカジノ</title>
+  <style>
+    body { font-family: sans-serif; background-color: #2c3e50; color: white; text-align: center; padding: 20px; }
+    .container { max-width: 500px; margin: 0 auto; background: #34495e; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    .points { font-size: 1.5em; font-weight: bold; color: #f1c40f; }
+    .btn-self { background-color: #3498db; color: white; padding: 15px 30px; border: none; border-radius: 5px; cursor: pointer; margin: 10px; font-weight: bold; font-size: 1.1em; }
+    .btn-cpu { background-color: #e74c3c; color: white; padding: 15px 30px; border: none; border-radius: 5px; cursor: pointer; margin: 10px; font-weight: bold; font-size: 1.1em; }
+    button:disabled { background-color: #7f8c8d !important; cursor: not-allowed; }
+    #log-area { margin-top: 20px; padding: 15px; background: #1a252f; border-radius: 5px; height: 150px; overflow-y: auto; text-align: left; font-size: 0.9em; line-height: 1.5; }
+    #status-msg { font-size: 1.3em; font-weight: bold; margin: 15px 0; color: #ecf0f1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🔫 ロシアンルーレット (vs CPU)</h2>
+    <p>参加費: 500もっち / 勝利(CPU死亡): 1000もっち獲得</p>
+    <p>所持金: <span id="display-points" class="points">---</span> もっち</p>
+
+    <div id="status-msg">ゲーム開始ボタンを押してください</div>
+
+    <button id="btn-start" onclick="startGame()" style="padding: 10px 20px; background: #2ecc71; border:none; color:white; border-radius:5px; cursor:pointer;">ゲーム開始 (500消費)</button>
+    
+    <div id="action-area" style="display: none; margin-top: 20px;">
+      <button id="btn-self" class="btn-self" onclick="shoot('self')">自分を撃つ</button>
+      <button id="btn-cpu" class="btn-cpu" onclick="shoot('cpu')">CPUを撃つ</button>
+    </div>
+
+    <div id="log-area"></div>
+    <br><a href="../index.html" style="color:#bdc3c7;">🔙 マイページに戻る</a>
+  </div>
+
+  <script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyOmbY7H3r9MIDMsH4m7BifWwIknowmiE9nD44wXZVFrffQYOPr_OSvaejnyQvAdVtZNw/exec";
+    const COST = 500;
+    const REWARD = 1000;
+    
+    let currentPoints = parseInt(localStorage.getItem('userPoints'));
+    document.getElementById('display-points').innerText = currentPoints;
+    
+    let cylinder = [];
+    let currentChamber = 0;
+    let isPlayerTurn = true;
+
+    function log(msg) {
+      const logArea = document.getElementById('log-area');
+      logArea.innerHTML += `<div>${msg}</div>`;
+      logArea.scrollTop = logArea.scrollHeight;
+    }
+
+    async function startGame() {
+      if (currentPoints < COST) { alert("もっちが足りません！"); return; }
+      
+      currentPoints -= COST;
+      document.getElementById('display-points').innerText = currentPoints;
+      
+      document.getElementById('btn-start').style.display = 'none';
+      document.getElementById('action-area').style.display = 'block';
+      document.getElementById('log-area').innerHTML = '';
+      
+      // シリンダーに弾を1発セットしてシャッフル
+      cylinder = [0, 0, 0, 0, 0, 1];
+      cylinder.sort(() => Math.random() - 0.5);
+      currentChamber = 0;
+      isPlayerTurn = true;
+
+      log("🔄 カチャッ... シリンダーを回した。");
+      log("🔫 弾は6発中1発。あなたのターンです。");
+      updateUI();
+    }
+
+    function updateUI() {
+      document.getElementById('btn-self').disabled = !isPlayerTurn;
+      document.getElementById('btn-cpu').disabled = !isPlayerTurn;
+      document.getElementById('status-msg').innerText = isPlayerTurn ? "あなたのターン" : "CPUのターン...";
+    }
+
+    async function shoot(target) {
+      isPlayerTurn = false; // 一旦ボタンをロック
+      updateUI();
+
+      const isBullet = (cylinder[currentChamber] === 1);
+      currentChamber++;
+
+      log(`▶ あなたは ${target === 'self' ? '自分' : 'CPU'} に向けて引き金を引いた...`);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 1秒タメる演出
+
+      if (isBullet) {
+        if (target === 'self') {
+          log("💥 バーン！！ あなたは死んでしまった...");
+          endGame(false);
+        } else {
+          log("💥 バーン！！ CPUは倒れた！あなたの勝ちです！");
+          endGame(true);
+        }
+      } else {
+        log("カチッ... 空砲だ。");
+        if (target === 'self') {
+          log("🔄 自分を撃って生き残ったため、あなたのターンが継続します。");
+          isPlayerTurn = true;
+          updateUI();
+        } else {
+          log("➡️ CPUのターンに移ります。");
+          setTimeout(cpuTurn, 1500);
+        }
+      }
+    }
+
+    async function cpuTurn() {
+      const isBullet = (cylinder[currentChamber] === 1);
+      currentChamber++;
+
+      // CPUの思考ルーチン: 80%でプレイヤーを撃つ、20%で自分を撃つ
+      const target = (Math.random() < 0.8) ? 'player' : 'self';
+      
+      log(`▶ CPUは ${target === 'player' ? 'あなた' : '自分自身'} に銃口を向け、引き金を引いた...`);
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      if (isBullet) {
+        if (target === 'player') {
+          log("💥 バーン！！ あなたは撃たれてしまった...");
+          endGame(false);
+        } else {
+          log("💥 バーン！！ CPUは自爆した！あなたの勝ちです！");
+          endGame(true);
+        }
+      } else {
+        log("カチッ... 空砲だ。");
+        if (target === 'self') {
+          log("🔄 CPUが生き残ったため、CPUのターンが継続します。");
+          setTimeout(cpuTurn, 1500);
+        } else {
+          log("➡️ あなたのターンに移ります。");
+          isPlayerTurn = true;
+          updateUI();
+        }
+      }
+    }
+
+    async function endGame(isPlayerWin) {
+      if (isPlayerWin) {
+        currentPoints += REWARD;
+        log(`💰 報酬 ${REWARD} もっちを獲得しました！`);
+      } else {
+        log("💀 ゲームオーバー。もっちは没収されました。");
+      }
+
+      document.getElementById('action-area').style.display = 'none';
+      document.getElementById('btn-start').style.display = 'inline-block';
+      document.getElementById('btn-start').innerText = "もう一度遊ぶ";
+      
+      // GAS(スプレッドシート)のデータベースを更新
+      await fetch(GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'updatePoints', id: localStorage.getItem('userId'), newPoints: currentPoints }),
+        headers: { 'Content-Type': 'text/plain' }
+      });
+      
+      localStorage.setItem('userPoints', currentPoints);
+      document.getElementById('display-points').innerText = currentPoints;
+    }
+  </script>
+</body>
+</html>
