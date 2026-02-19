@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>サイコロ - もっちカジノ</title>
+  <style>
+    /* CSSはコイントスと同様（省略して記載しますが、実際のファイルには反映させてください） */
+    body { font-family: sans-serif; background-color: #f4f7f6; text-align: center; padding: 20px; }
+    .container { max-width: 500px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    .points { font-size: 1.5em; font-weight: bold; color: #e74c3c; }
+    .btn-even { background-color: #2c3e50; color: white; padding: 15px 30px; border-radius: 5px; cursor: pointer; margin: 10px; font-weight: bold; }
+    .btn-odd { background-color: #e67e22; color: white; padding: 15px 30px; border-radius: 5px; cursor: pointer; margin: 10px; font-weight: bold; }
+    #result-area { margin-top: 20px; padding: 15px; font-weight: bold; font-size: 1.2em; border-radius: 5px; display: none; }
+    button:disabled { background-color: #bdc3c7 !important; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🎲 サイコロ (丁半)</h2>
+    <p>参加費: 200 もっち / 勝利報酬: 400 もっち</p>
+    <div style="background: #fcf3cf; padding: 10px; border-radius: 10px; margin-bottom: 20px;">
+      <p>所持金: <span id="display-points" class="points">---</span> もっち</p>
+    </div>
+
+    <p>出目は「偶数」か「奇数」か？</p>
+    <button id="btn-even" class="btn-even" onclick="playGame('偶数')">偶数 (丁)</button>
+    <button id="btn-odd" class="btn-odd" onclick="playGame('奇数')">奇数 (半)</button>
+
+    <div id="result-area"></div>
+    <br><a href="../index.html">🔙 マイページに戻る</a>
+  </div>
+
+  <script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyOmbY7H3r9MIDMsH4m7BifWwIknowmiE9nD44wXZVFrffQYOPr_OSvaejnyQvAdVtZNw/exec";
+    const COST = 200;
+    const REWARD = 400;
+
+    let currentPoints = parseInt(localStorage.getItem('userPoints'));
+    document.getElementById('display-points').innerText = currentPoints;
+
+    async function playGame(bet) {
+      if (currentPoints < COST) { alert("もっちが足りません！"); return; }
+      
+      document.getElementById('btn-even').disabled = true;
+      document.getElementById('btn-odd').disabled = true;
+      const resArea = document.getElementById('result-area');
+      resArea.style.display = 'block';
+      resArea.innerText = "サイコロを振っています...";
+
+      const dice = Math.floor(Math.random() * 6) + 1;
+      const result = (dice % 2 === 0) ? '偶数' : '奇数';
+      
+      currentPoints -= COST;
+      const isWin = (bet === result);
+      if (isWin) currentPoints += REWARD;
+
+      try {
+        await fetch(GAS_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'updatePoints', id: localStorage.getItem('userId'), newPoints: currentPoints }),
+          headers: { 'Content-Type': 'text/plain' }
+        });
+        
+        localStorage.setItem('userPoints', currentPoints);
+        document.getElementById('display-points').innerText = currentPoints;
+        resArea.innerText = `出目は「${dice}」(${result})！\n${isWin ? '当たり！ +200もっち' : 'ハズレ...'}`;
+        resArea.style.backgroundColor = isWin ? '#d5f5e3' : '#fadbd8';
+      } catch (e) { alert("通信失敗"); }
+      
+      document.getElementById('btn-even').disabled = false;
+      document.getElementById('btn-odd').disabled = false;
+    }
+  </script>
+</body>
+</html>
