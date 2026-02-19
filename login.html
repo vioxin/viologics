@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ログイン - もっちカジノ</title>
+</head>
+<body>
+  <h2>ログイン</h2>
+  
+  <div>
+    <input type="text" id="login-id" placeholder="ユーザーID"><br><br>
+    <input type="password" id="login-pass" placeholder="パスワード"><br><br>
+    <button onclick="loginUser()">ログイン</button>
+  </div>
+
+  <p><a href="register.html">新規登録はこちら</a></p>
+
+  <script>
+    const GAS_URL = "あなたのGAS_WEBアプリのURL";
+
+    async function loginUser() {
+      const btn = document.querySelector('button');
+      btn.disabled = true;
+      btn.innerText = "認証中...";
+
+      const data = {
+        action: 'login',
+        id: document.getElementById('login-id').value,
+        password: document.getElementById('login-pass').value
+      };
+
+      try {
+        const response = await fetch(GAS_URL, {
+          method: 'POST',
+          body: JSON.stringify(data),
+          headers: { 'Content-Type': 'text/plain' }
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          // ブラウザにユーザー情報を保存
+          localStorage.setItem('userId', document.getElementById('login-id').value);
+          localStorage.setItem('userName', result.displayName);
+          localStorage.setItem('userPoints', result.points);
+          
+          alert("ログインに成功しました！");
+          window.location.href = "index.html"; // メインページへ戻る
+        } else {
+          alert("ログイン失敗: " + result.message);
+          btn.disabled = false;
+          btn.innerText = "ログイン";
+        }
+      } catch (e) {
+        alert("通信エラーです。");
+        btn.disabled = false;
+        btn.innerText = "ログイン";
+      }
+    }
+  </script>
+</body>
+</html>
