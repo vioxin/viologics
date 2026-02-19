@@ -2,24 +2,39 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-width=1.0">
   <title>ログイン - もっちカジノ</title>
+  <style>
+    body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f7f6; color: #333; text-align: center; padding: 20px; }
+    .container { max-width: 400px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    h2 { color: #2c3e50; }
+    input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 1em; }
+    button { background-color: #f39c12; color: white; border: none; padding: 12px 20px; cursor: pointer; border-radius: 5px; font-weight: bold; width: 90%; margin-top: 15px; font-size: 1.1em; transition: 0.3s; }
+    button:hover { background-color: #d68910; }
+    button:disabled { background-color: #95a5a6; cursor: not-allowed; }
+    .link { margin-top: 20px; display: block; color: #3498db; text-decoration: none; }
+    .link:hover { text-decoration: underline; }
+  </style>
 </head>
 <body>
-  <h2>ログイン</h2>
-  
-  <div>
-    <input type="text" id="login-id" placeholder="ユーザーID"><br><br>
-    <input type="password" id="login-pass" placeholder="パスワード"><br><br>
-    <button onclick="loginUser()">ログイン</button>
+  <div class="container">
+    <h2>ログイン</h2>
+    
+    <div>
+      <input type="text" id="login-id" placeholder="ユーザーID">
+      <input type="password" id="login-pass" placeholder="パスワード">
+      <button id="login-btn" onclick="loginUser()">ログイン</button>
+    </div>
+
+    <a href="register.html" class="link">新規登録はこちら</a>
   </div>
 
-  <p><a href="register.html">新規登録はこちら</a></p>
-
   <script>
+    // ★必ず正しいウェブアプリのURL（/exec で終わるもの）に書き換えてください
     const GAS_URL = "https://script.google.com/macros/s/AKfycbyOmbY7H3r9MIDMsH4m7BifWwIknowmiE9nD44wXZVFrffQYOPr_OSvaejnyQvAdVtZNw/exec";
 
     async function loginUser() {
-      const btn = document.querySelector('button');
+      const btn = document.getElementById('login-btn');
       btn.disabled = true;
       btn.innerText = "認証中...";
 
@@ -38,20 +53,19 @@
         const result = await response.json();
         
         if (result.success) {
-          // ブラウザにユーザー情報を保存
           localStorage.setItem('userId', document.getElementById('login-id').value);
           localStorage.setItem('userName', result.displayName);
           localStorage.setItem('userPoints', result.points);
           
           alert("ログインに成功しました！");
-          window.location.href = "index.html"; // メインページへ戻る
+          window.location.href = "index.html"; 
         } else {
           alert("ログイン失敗: " + result.message);
           btn.disabled = false;
           btn.innerText = "ログイン";
         }
       } catch (e) {
-        alert("通信エラーです。");
+        alert("通信エラーです。URLが正しいか確認してください。");
         btn.disabled = false;
         btn.innerText = "ログイン";
       }
