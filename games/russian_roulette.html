@@ -2,73 +2,101 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ロシアンルーレット - もっちカジノ</title>
   <style>
-    body { font-family: sans-serif; background-color: #2c3e50; color: white; text-align: center; padding: 20px; }
-    .container { max-width: 500px; margin: 0 auto; background: #34495e; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    body { font-family: sans-serif; background-color: #111; color: white; text-align: center; padding: 20px; margin: 0; transition: background-color 0.1s; }
+    /* 発砲時のフラッシュ */
+    body.flash-red { background-color: #ff0000; }
+    body.flash-white { background-color: #ffffff; }
+    
+    .container { max-width: 500px; margin: 0 auto; background: #222; padding: 30px; border-radius: 10px; border: 1px solid #444; width: 90%; box-sizing: border-box; }
     .points { font-size: 1.5em; font-weight: bold; color: #f1c40f; }
-    .btn-self { background-color: #3498db; color: white; padding: 15px 30px; border: none; border-radius: 5px; cursor: pointer; margin: 10px; font-weight: bold; font-size: 1.1em; }
-    .btn-cpu { background-color: #e74c3c; color: white; padding: 15px 30px; border: none; border-radius: 5px; cursor: pointer; margin: 10px; font-weight: bold; font-size: 1.1em; }
-    button:disabled { background-color: #7f8c8d !important; cursor: not-allowed; }
-    #log-area { margin-top: 20px; padding: 15px; background: #1a252f; border-radius: 5px; height: 150px; overflow-y: auto; text-align: left; font-size: 0.9em; line-height: 1.5; }
-    #status-msg { font-size: 1.3em; font-weight: bold; margin: 15px 0; color: #ecf0f1; }
+    
+    .bet-area { background: #333; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+    input[type="number"] { padding: 10px; font-size: 1.2em; width: 120px; text-align: right; border-radius: 5px; border: none; background: #eee; }
+    
+    /* シリンダー回転アニメーション */
+    .cylinder-icon { font-size: 4em; display: inline-block; margin: 10px 0; transition: transform 1.5s cubic-bezier(0.25, 0.1, 0.25, 1); }
+    
+    .btn-self { background-color: #3498db; color: white; padding: 15px 30px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; font-weight: bold; width: 45%; }
+    .btn-cpu { background-color: #e74c3c; color: white; padding: 15px 30px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; font-weight: bold; width: 45%; }
+    button:disabled { background-color: #555 !important; color: #888 !important; cursor: not-allowed; }
+    
+    #log-area { margin-top: 20px; padding: 15px; background: #000; border-radius: 5px; height: 180px; overflow-y: auto; text-align: left; font-size: 0.95em; line-height: 1.6; border: 1px solid #444; }
+    #status-msg { font-size: 1.2em; font-weight: bold; margin: 15px 0; color: #ecf0f1; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>🔫 ロシアンルーレット (vs CPU)</h2>
-    <p>参加費: 500もっち / 勝利(CPU死亡): 1000もっち獲得</p>
+    <h2>🔫 ロシアンルーレット</h2>
     <p>所持金: <span id="display-points" class="points">---</span> もっち</p>
 
-    <div id="status-msg">ゲーム開始ボタンを押してください</div>
+    <div class="bet-area" id="bet-area">
+      賭け金: <input type="number" id="bet-amount" value="500" min="100" step="100"> もっち
+    </div>
 
-    <button id="btn-start" onclick="startGame()" style="padding: 10px 20px; background: #2ecc71; border:none; color:white; border-radius:5px; cursor:pointer;">ゲーム開始 (500消費)</button>
+    <div>
+      <span id="cylinder" class="cylinder-icon">⚙️</span>
+    </div>
+
+    <div id="status-msg">賭け金を決めてゲーム開始を押してください</div>
+
+    <button id="btn-start" onclick="startGame()" style="padding: 12px 25px; background: #2ecc71; border:none; color:white; border-radius:5px; font-size: 1.1em; cursor:pointer; width: 80%;">ゲーム開始</button>
     
-    <div id="action-area" style="display: none; margin-top: 20px;">
+    <div id="action-area" style="display: none; margin-top: 15px;">
       <button id="btn-self" class="btn-self" onclick="shoot('self')">自分を撃つ</button>
       <button id="btn-cpu" class="btn-cpu" onclick="shoot('cpu')">CPUを撃つ</button>
     </div>
 
     <div id="log-area"></div>
-    <br><a href="../index.html" style="color:#bdc3c7;">🔙 マイページに戻る</a>
+    <br><a href="../index.html" style="color:#777;">🔙 マイページに戻る</a>
   </div>
 
   <script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbyOmbY7H3r9MIDMsH4m7BifWwIknowmiE9nD44wXZVFrffQYOPr_OSvaejnyQvAdVtZNw/exec";
-    const COST = 500;
-    const REWARD = 1000;
-    
     let currentPoints = parseInt(localStorage.getItem('userPoints'));
     document.getElementById('display-points').innerText = currentPoints;
-    
-    let cylinder = [];
-    let currentChamber = 0;
-    let isPlayerTurn = true;
+    let betAmount = 0;
+    let cylinder = [], currentChamber = 0, isPlayerTurn = true;
 
-    function log(msg) {
+    function log(msg, color = "white") {
       const logArea = document.getElementById('log-area');
-      logArea.innerHTML += `<div>${msg}</div>`;
+      logArea.innerHTML += `<div style="color: ${color};">${msg}</div>`;
       logArea.scrollTop = logArea.scrollHeight;
     }
 
+    // 画面フラッシュ演出
+    function flashScreen(isBullet) {
+      document.body.classList.add(isBullet ? 'flash-red' : 'flash-white');
+      setTimeout(() => {
+        document.body.className = '';
+      }, 100);
+    }
+
     async function startGame() {
-      if (currentPoints < COST) { alert("もっちが足りません！"); return; }
+      betAmount = parseInt(document.getElementById('bet-amount').value);
+      if (betAmount < 10 || currentPoints < betAmount) { alert("賭け金が不正か、もっちが足りません！"); return; }
       
-      currentPoints -= COST;
-      document.getElementById('display-points').innerText = currentPoints;
+      currentPoints -= betAmount;
+      updateDisplay();
       
+      document.getElementById('bet-area').style.display = 'none';
       document.getElementById('btn-start').style.display = 'none';
       document.getElementById('action-area').style.display = 'block';
       document.getElementById('log-area').innerHTML = '';
       
-      // シリンダーに弾を1発セットしてシャッフル
-      cylinder = [0, 0, 0, 0, 0, 1];
-      cylinder.sort(() => Math.random() - 0.5);
+      // シリンダーを回転させる演出
+      const cylIcon = document.getElementById('cylinder');
+      cylIcon.style.transform = `rotate(${Math.floor(Math.random() * 1080 + 720)}deg)`;
+
+      cylinder = [0, 0, 0, 0, 0, 1].sort(() => Math.random() - 0.5);
       currentChamber = 0;
       isPlayerTurn = true;
 
-      log("🔄 カチャッ... シリンダーを回した。");
-      log("🔫 弾は6発中1発。あなたのターンです。");
+      log("🔄 カラカラカラッ... シリンダーを回した。", "#aaa");
+      await new Promise(r => setTimeout(r, 1500));
+      log("🔫 弾は6発中1発。あなたのターンです。", "#f1c40f");
       updateUI();
     }
 
@@ -79,31 +107,25 @@
     }
 
     async function shoot(target) {
-      isPlayerTurn = false; // 一旦ボタンをロック
-      updateUI();
-
+      isPlayerTurn = false; updateUI();
       const isBullet = (cylinder[currentChamber] === 1);
       currentChamber++;
 
-      log(`▶ あなたは ${target === 'self' ? '自分' : 'CPU'} に向けて引き金を引いた...`);
-      await new Promise(resolve => setTimeout(resolve, 1000)); // 1秒タメる演出
+      log(`▶ あなたは ${target === 'self' ? '自分' : 'CPU'} に引き金を引いた...`);
+      await new Promise(r => setTimeout(r, 1000)); 
+      
+      flashScreen(isBullet);
 
       if (isBullet) {
-        if (target === 'self') {
-          log("💥 バーン！！ あなたは死んでしまった...");
-          endGame(false);
-        } else {
-          log("💥 バーン！！ CPUは倒れた！あなたの勝ちです！");
-          endGame(true);
-        }
+        if (target === 'self') { log("💥 バーン！！ あなたは死んでしまった...", "#e74c3c"); endGame(false); } 
+        else { log("💥 バーン！！ CPUは倒れた！あなたの勝ち！", "#2ecc71"); endGame(true); }
       } else {
-        log("カチッ... 空砲だ。");
+        log("カチッ... 空砲だ。", "#aaa");
         if (target === 'self') {
-          log("🔄 自分を撃って生き残ったため、あなたのターンが継続します。");
-          isPlayerTurn = true;
-          updateUI();
+          log("🔄 勇気を讃えられ、あなたのターン継続。", "#3498db");
+          isPlayerTurn = true; updateUI();
         } else {
-          log("➡️ CPUのターンに移ります。");
+          log("➡️ 銃を渡し、CPUのターンに移る。", "#e67e22");
           setTimeout(cpuTurn, 1500);
         }
       }
@@ -112,53 +134,49 @@
     async function cpuTurn() {
       const isBullet = (cylinder[currentChamber] === 1);
       currentChamber++;
-
-      // CPUの思考ルーチン: 80%でプレイヤーを撃つ、20%で自分を撃つ
-      const target = (Math.random() < 0.8) ? 'player' : 'self';
+      const target = (Math.random() < 0.8) ? 'player' : 'self'; // 80%でプレイヤーを狙う
       
-      log(`▶ CPUは ${target === 'player' ? 'あなた' : '自分自身'} に銃口を向け、引き金を引いた...`);
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      log(`▶ CPUは ${target === 'player' ? 'あなた' : '自分自身'} に引き金を引いた...`);
+      await new Promise(r => setTimeout(r, 1500));
+      
+      flashScreen(isBullet);
 
       if (isBullet) {
-        if (target === 'player') {
-          log("💥 バーン！！ あなたは撃たれてしまった...");
-          endGame(false);
-        } else {
-          log("💥 バーン！！ CPUは自爆した！あなたの勝ちです！");
-          endGame(true);
-        }
+        if (target === 'player') { log("💥 バーン！！ あなたは撃たれてしまった...", "#e74c3c"); endGame(false); } 
+        else { log("💥 バーン！！ CPUは自爆した！あなたの勝ち！", "#2ecc71"); endGame(true); }
       } else {
-        log("カチッ... 空砲だ。");
+        log("カチッ... 空砲だ。", "#aaa");
         if (target === 'self') {
-          log("🔄 CPUが生き残ったため、CPUのターンが継続します。");
-          setTimeout(cpuTurn, 1500);
+          log("🔄 CPUのターン継続。", "#3498db"); setTimeout(cpuTurn, 1500);
         } else {
-          log("➡️ あなたのターンに移ります。");
-          isPlayerTurn = true;
-          updateUI();
+          log("➡️ 銃を受け取った。あなたのターン。", "#e67e22");
+          isPlayerTurn = true; updateUI();
         }
       }
     }
 
     async function endGame(isPlayerWin) {
       if (isPlayerWin) {
-        currentPoints += REWARD;
-        log(`💰 報酬 ${REWARD} もっちを獲得しました！`);
+        let reward = betAmount * 2;
+        currentPoints += reward;
+        log(`💰 生還報酬として ${reward} もっちを獲得！`, "#f1c40f");
       } else {
-        log("💀 ゲームオーバー。もっちは没収されました。");
+        log("💀 ゲームオーバー。もっちは没収された。", "#7f8c8d");
       }
 
       document.getElementById('action-area').style.display = 'none';
       document.getElementById('btn-start').style.display = 'inline-block';
       document.getElementById('btn-start').innerText = "もう一度遊ぶ";
+      document.getElementById('bet-area').style.display = 'block';
       
-      // GAS(スプレッドシート)のデータベースを更新
       await fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'updatePoints', id: localStorage.getItem('userId'), newPoints: currentPoints }),
+        method: 'POST', body: JSON.stringify({ action: 'updatePoints', id: localStorage.getItem('userId'), newPoints: currentPoints }),
         headers: { 'Content-Type': 'text/plain' }
       });
-      
+      updateDisplay();
+    }
+
+    function updateDisplay() {
       localStorage.setItem('userPoints', currentPoints);
       document.getElementById('display-points').innerText = currentPoints;
     }
