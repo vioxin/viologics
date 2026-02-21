@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ランキング - もっちカジノ</title>
+  <style>
+    body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f7f6; color: #333; text-align: center; padding: 20px; margin: 0; }
+    .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 90%; box-sizing: border-box; }
+    h1 { color: #f39c12; }
+    .ranking-list { list-style: none; padding: 0; margin: 0; text-align: left; }
+    .ranking-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #eee; font-size: 1.2em; }
+    .ranking-item:nth-child(1) { font-weight: bold; background: #fff8e1; color: #d35400; font-size: 1.4em; border-radius: 10px 10px 0 0; }
+    .ranking-item:nth-child(2) { font-weight: bold; background: #f5f5f5; color: #7f8c8d; font-size: 1.3em; }
+    .ranking-item:nth-child(3) { font-weight: bold; background: #fdf2e9; color: #a04000; font-size: 1.2em; }
+    .rank-num { width: 40px; text-align: center; }
+    .rank-name { flex-grow: 1; padding-left: 10px; }
+    .rank-points { font-weight: bold; color: #e74c3c; }
+    #loading { font-size: 1.2em; color: #7f8c8d; margin: 50px 0; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>👑 大富豪ランキング</h1>
+    <p>現在のトップ10プレイヤーを表示しています。</p>
+    
+    <div id="loading">集計中... ⏳</div>
+    
+    <ul id="ranking-list" class="ranking-list" style="display: none;">
+      </ul>
+
+    <br><br>
+    <a href="index.html" style="display:inline-block; padding:10px 20px; background:#3498db; color:white; text-decoration:none; border-radius:5px;">🏠 マイページに戻る</a>
+  </div>
+
+  <script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyOmbY7H3r9MIDMsH4m7BifWwIknowmiE9nD44wXZVFrffQYOPr_OSvaejnyQvAdVtZNw/exec"; // ★書き換えてください
+
+    window.onload = async function() {
+      try {
+        const response = await fetch(GAS_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'getRanking' }),
+          headers: { 'Content-Type': 'text/plain' }
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          document.getElementById('loading').style.display = 'none';
+          const list = document.getElementById('ranking-list');
+          list.style.display = 'block';
+          
+          result.ranking.forEach((user, index) => {
+            const li = document.createElement('li');
+            li.className = 'ranking-item';
+            
+            let rankIcon = `${index + 1}位`;
+            if (index === 0) rankIcon = '🥇';
+            if (index === 1) rankIcon = '🥈';
+            if (index === 2) rankIcon = '🥉';
+
+            li.innerHTML = `
+              <span class="rank-num">${rankIcon}</span>
+              <span class="rank-name">${user.name}</span>
+              <span class="rank-points">${user.points.toLocaleString()} もっち</span>
+            `;
+            list.appendChild(li);
+          });
+        }
+      } catch (e) {
+        document.getElementById('loading').innerText = "ランキングの取得に失敗しました。";
+      }
+    };
+  </script>
+
+</body>
+</html>
