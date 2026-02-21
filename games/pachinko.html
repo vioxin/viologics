@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>パチンコ - もっちカジノ</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <style>
+    body { font-family: sans-serif; background-color: #2c3e50; color: white; text-align: center; padding: 20px; margin: 0; }
+    .container { max-width: 500px; margin: 0 auto; background: #34495e; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); width: 90%; }
+    h2 { color: #f1c40f; margin-top: 0; }
+    .status-bar { display: flex; justify-content: space-around; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 5px; margin-bottom: 10px; }
+    .points { font-size: 1.2em; font-weight: bold; color: #f1c40f; }
+    
+    #pachinko-area { position: relative; margin: 0 auto; width: 100%; max-width: 400px; border: 5px solid #bdc3c7; border-radius: 10px; background: #1a252f; overflow: hidden; }
+    /* Matter.jsのCanvasをレスポンシブ対応させる */
+    canvas { width: 100% !important; height: auto !important; display: block; }
+    
+    #slot-screen { background: #000; color: #00ff00; font-family: 'Courier New', monospace; font-size: 1.5em; padding: 10px; margin-bottom: 10px; border-radius: 5px; font-weight: bold; border: 2px solid #2ecc71; letter-spacing: 2px; }
+    .jackpot { color: #ff00ff !important; animation: flash 0.5s infinite alternate; }
+    @keyframes flash { from { text-shadow: 0 0 10px #ff00ff; } to { text-shadow: 0 0 30px #ff00ff, 0 0 50px #ff00ff; } }
+
+    button { padding: 15px 30px; font-size: 1.2em; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 80%; max-width: 250px; transition: 0.1s; margin-bottom: 15px; }
+    button:active { transform: scale(0.95); }
+    button:disabled { background: #7f8c8d; cursor: not-allowed; transform: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🎰 物理パチンコ</h2>
+    
+    <div class="status-bar">
+      <div>所持金: <span id="display-points" class="points">---</span></div>
+      <div>1球: 100 もっち</div>
+    </div>
+
+    <div id="slot-screen">待機中...</div>
+
+    <div id="pachinko-area"></div>
+
+    <br>
+    <button id="btn-shoot" onclick="shoot()">1球打つ (100消費)</button>
+    
+    <br><a href="../index.html" style="color:#bdc3c7; text-decoration: none;">🔙 マイページに戻る</a>
+  </div>
+
+  <script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyOmbY7H3r9MIDMsH4m7BifWwIknowmiE9nD44wXZVFrffQYOPr_OSvaejnyQvAdVtZNw/exec";
+    let currentPoints = parseInt(localStorage.getItem('userPoints'));
+    document.getElementById('display-points').innerText = currentPoints;
+
+    // --- Matter.js のセットアップ ---
+    const { Engine, Render, Runner, World, Bodies, Events, Composite } = Matter;
+    const engine = Engine.create();
+    
+    // キャンバスの内部サイズ（見た目はCSSで縮小・拡大されます）
+    const width = 400;
+    const height = 600;
+
+    const render = Render.create({
+      element: document.getElementById('pachinko-area'),
+      engine: engine,
+      options: {
+        width: width, height: height,
+        wireframes: false, background: '#1a252f'
+      }
+    });
+
+    // --- 盤面の作成（釘と壁と穴） ---
+    const bodies = [];
+    
+    // 外壁
+    bodies.push(Bodies.rectangle(width/2, -50, width, 100, { isStatic: true })); // 天井
+    bodies.push(Bodies.rectangle(-25, height/2, 50, height, { isStatic: true })); // 左壁
+    bodies.push(Bodies.rectangle(width+25, height/2, 50, height, { isStatic: true })); // 右壁
+
+    // 釘（ピン）を等間隔に配置
+    const rows = 10;
+    const cols = 9;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        // 行ごとに少しずらす（千鳥配置）
+        let xOffset = (r % 2 === 0) ? 0 : 20;
+        let x = c * 45 + 20 + xOffset;
+        let y = r * 45 + 100;
+        
+        // 画面外にはみ出る釘は作らない
+        if (x > 10 && x < width - 10) {
+          bodies.push(Bodies.circle(x, y, 4, { 
+            isStatic: true, 
+            restitution: 0.5, // 弾力
+            render: { fillStyle: '#bdc3c7' } 
+          }));
+        }
+      }
+    }
+
+    // 下部の仕切りと入賞穴（センサー）
+    bodies.push(Bodies.rectangle(width/2 - 60, height - 20, 10, 80, { isStatic: true, render: { fillStyle: '#7f8c8d' } }));
+    bodies.push(Bodies.rectangle(width/2 + 60, height - 20, 10, 80, { isStatic: true, render: { fillStyle: '#7f8c8d' } }));
+    
+    // 中央START穴センサー（当たり判定用）
+    const startSensor = Bodies.rectangle(width/2, height - 10, 100, 20, { 
+      isStatic: true, isSensor: true, label: 'START_HOLE',
+      render: { fillStyle: '#e74c3c' } 
+    });
+    bodies.push(startSensor);
+
+    World.add(engine.world, bodies);
+    Render.run(render);
+    Runner.run(Runner.create(), engine);
+
+    // --- ゲームロジック ---
+    let isShooting = false;
+
+    function shoot() {
+      if (currentPoints < 100) { alert("もっちが足りません！"); return; }
+      if (isShooting) return; // 連打防止
+      
+      isShooting = true;
+      document.getElementById('btn-shoot').disabled = true;
+
+      // 賭け金消費
+      currentPoints -= 100;
+      updateDisplay();
+
+      // ランダムな位置から球を落とす（物理演算に確率の揺らぎを与える）
+      const randomX = (width / 2) + (Math.random() * 60 - 30);
+      const ball = Bodies.circle(randomX, 20, 8, {
+        restitution: 0.7, // 球の弾みやすさ
+        friction: 0.005,
+        density: 0.05,
+        label: 'BALL',
+        render: { fillStyle: '#f1c40f' }
+      });
+
+      World.add(engine.world, ball);
+
+      // 連打防止解除 (0.5秒後)
+      setTimeout(() => {
+        isShooting = false;
+        document.getElementById('btn-shoot').disabled = false;
+      }, 500);
+
+      // 10秒経っても落ちきらなかった球は削除（詰まり防止）
+      setTimeout(() => {
+        if (ball.parent) World.remove(engine.world, ball);
+      }, 10000);
+    }
+
+    // 衝突判定（球が穴に入ったか、下に落ちたか）
+    Events.on(engine, 'collisionStart', function(event) {
+      const pairs = event.pairs;
+      for (let i = 0; i < pairs.length; i++) {
+        const bodyA = pairs[i].bodyA;
+        const bodyB = pairs[i].bodyB;
+
+        // START穴に入った場合
+        if ((bodyA.label === 'BALL' && bodyB.label === 'START_HOLE') || 
+            (bodyB.label === 'BALL' && bodyA.label === 'START_HOLE')) {
+          
+          const ball = bodyA.label === 'BALL' ? bodyA : bodyB;
+          World.remove(engine.world, ball); // 球を消す
+          triggerSlot(); // 抽選開始！
+        }
+      }
+    });
+
+    // 画面外（ハズレ）に落ちた球を消す監視ループ
+    Events.on(engine, 'afterUpdate', function() {
+      const allBodies = Composite.allBodies(engine.world);
+      allBodies.forEach(body => {
+        if (body.label === 'BALL' && body.position.y > height + 20) {
+          World.remove(engine.world, body); // ハズレ球を削除
+        }
+      });
+    });
+
+    // --- デジタル抽選（確率要素） ---
+    async function triggerSlot() {
+      const screen = document.getElementById('slot-screen');
+      screen.classList.remove('jackpot');
+      screen.style.color = "#00ff00";
+      
+      // 演出：数字がパラパラ変わる
+      let spinCount = 0;
+      const spinInterval = setInterval(() => {
+        screen.innerText = `${Math.floor(Math.random()*9)+1} ${Math.floor(Math.random()*9)+1} ${Math.floor(Math.random()*9)+1}`;
+        spinCount++;
+      }, 50);
+
+      await new Promise(r => setTimeout(r, 1500));
+      clearInterval(spinInterval);
+
+      // 確率判定
+      const rand = Math.random();
+      let reward = 0;
+
+      if (rand < 0.10) {
+        // 10%で大当たり
+        screen.innerText = "7 7 7 (大当り!)";
+        screen.classList.add('jackpot');
+        reward = 1500;
+      } else if (rand < 0.40) {
+        // 30%で小当たり
+        screen.innerText = "3 3 3 (小当り)";
+        screen.style.color = "#f1c40f";
+        reward = 300;
+      } else {
+        // 60%でハズレ
+        screen.innerText = "1 4 7 (ハズレ)";
+        screen.style.color = "#7f8c8d";
+      }
+
+      if (reward > 0) {
+        currentPoints += reward;
+        updateDisplay();
+        syncGas();
+      }
+    }
+
+    function updateDisplay() {
+      localStorage.setItem('userPoints', currentPoints);
+      document.getElementById('display-points').innerText = currentPoints;
+    }
+
+    // GAS通信（スパム防止のため大当たり時などに呼び出し）
+    function syncGas() {
+      fetch(GAS_URL, {
+        method: 'POST', body: JSON.stringify({ action: 'updatePoints', id: localStorage.getItem('userId'), newPoints: currentPoints }),
+        headers: { 'Content-Type': 'text/plain' }
+      }).catch(e => console.error("GAS同期エラー"));
+    }
+  </script>
+</body>
+</html>
