@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ルーレット - もっちカジノ</title>
+  <style>
+    body { font-family: sans-serif; background-color: #1a252f; color: white; text-align: center; padding: 20px; margin: 0; }
+    .container { max-width: 500px; margin: 0 auto; background: #2c3e50; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); width: 90%; box-sizing: border-box; }
+    h2 { color: #f1c40f; margin-top: 0; }
+    .points { font-size: 1.5em; font-weight: bold; color: #f1c40f; }
+
+    .bet-area { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+    input[type="number"] { padding: 10px; font-size: 1.2em; width: 120px; text-align: right; border-radius: 5px; border: none; }
+
+    /* ルーレットのアニメーション周り */
+    .roulette-container { position: relative; width: 250px; height: 250px; margin: 30px auto; }
+    .pointer { width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 30px solid #f1c40f; position: absolute; top: -20px; left: 50%; transform: translateX(-50%); z-index: 10; filter: drop-shadow(0 3px 3px rgba(0,0,0,0.5)); }
+    .wheel { width: 100%; height: 100%; border-radius: 50%; border: 5px solid #bdc3c7; box-sizing: border-box; transition: transform 4s cubic-bezier(0.25, 0.1, 0.25, 1); box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+    .wheel-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70px; height: 70px; background: #ecf0f1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2em; font-weight: bold; color: #333; border: 4px solid #7f8c8d; box-shadow: inset 0 3px 5px rgba(0,0,0,0.3); z-index: 5; }
+
+    /* ボタンデザイン */
+    .btn-red { background-color: #e74c3c; color: white; border: 2px solid #c0392b; padding: 15px 20px; cursor: pointer; border-radius: 5px; font-weight: bold; font-size: 1.1em; margin: 5px; width: 45%; transition: 0.1s; }
+    .btn-black { background-color: #34495e; color: white; border: 2px solid #2c3e50; padding: 15px 20px; cursor: pointer; border-radius: 5px; font-weight: bold; font-size: 1.1em; margin: 5px; width: 45%; transition: 0.1s; }
+    button:active { transform: scale(0.95); }
+    button:disabled { background-color: #7f8c8d !important; border-color: #95a5a6 !important; cursor: not-allowed; transform: none; }
+    
+    #result-area { margin-top: 20px; padding: 15px; font-weight: bold; font-size: 1.2em; border-radius: 5px; min-height: 1.5em; background: rgba(0,0,0,0.3); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🎡 ルーレット</h2>
+    <p>所持金: <span id="display-points" class="points">---</span> もっち</p>
+
+    <div class="bet-area">
+      賭け金: <input type="number" id="bet-amount" value="200" min="10" step="10"> もっち
+    </div>
+
+    <div class="roulette-container">
+      <div class="pointer"></div>
+      <div id="wheel" class="wheel"></div>
+      <div id="wheel-center" class="wheel-center">?</div>
+    </div>
+
+    <div id="game-area">
+      <button id="btn-red" class="btn-red" onclick="spin('red')">赤に賭ける (2倍)</button>
+      <button id="btn-black" class="btn-black" onclick="spin('black')">黒に賭ける (2倍)</button>
+      <p style="font-size: 0.8em; color: #bdc3c7;">※「0 (緑)」が出た場合は両方ハズレとなります</p>
+    </div>
+
+    <div id="result-area">賭け金を決めて色を選んでください</div>
+
+    <br><a href="../index.html" style="color:#bdc3c7; text-decoration: none;">🔙 マイページに戻る</a>
+  </div>
+
+  <script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyOmbY7H3r9MIDMsH4m7BifWwIknowmiE9nD44wXZVFrffQYOPr_OSvaejnyQvAdVtZNw/exec"; // ★書き換えてください
+    let currentPoints = parseInt(localStorage.getItem('userPoints'));
+    document.getElementById('display-points').innerText = currentPoints;
+
+    // ヨーロピアンルーレットの数字の並び順（0〜36）
+    const order = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+    const reds = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+    
+    // 円盤の色分けを動的に生成
+    let gradientStr = [];
+    const sliceAngle = 360 / 37;
+    for(let i = 0; i < 37; i++) {
+      let num = order[i];
+      let color = (num === 0) ? '#27ae60' : (reds.includes(num) ? '#c0392b' : '#34495e');
+      let startAngle = i * sliceAngle;
+      let endAngle = (i + 1) * sliceAngle;
+      gradientStr.push(`${color} ${startAngle}deg ${endAngle}deg`);
+    }
+    document.getElementById('wheel').style.background = `conic-gradient(from -${sliceAngle/2}deg, ${gradientStr.join(', ')})`;
+
+    let currentRotation = 0;
+
+    async function spin(betColor) {
+      const betAmount = parseInt(document.getElementById('bet-amount').value);
+      if (betAmount < 10 || currentPoints < betAmount) { alert("賭け金が不正か、もっちが足りません！"); return; }
+
+      // UIをロック
+      document.getElementById('btn-red').disabled = true;
+      document.getElementById('btn-black').disabled = true;
+      const resultArea = document.getElementById('result-area');
+      resultArea.innerText = "スピン中...";
+      resultArea.style.color = "white";
+
+      // 掛け金消費
+      currentPoints -= betAmount;
+      updateDisplay();
+
+      // 結果の抽選
+      const resultIndex = Math.floor(Math.random() * 37);
+      const resultNum = order[resultIndex];
+      const resultIsRed = reds.includes(resultNum);
+      const actualColor = (resultNum === 0) ? 'green' : (resultIsRed ? 'red' : 'black');
+
+      // 回転角度の計算（必ず選ばれた数字が上に来るようにする）
+      const extraSpins = 5; // 5周回る
+      const targetAngle = 360 - (resultIndex * sliceAngle);
+      const currentBase = currentRotation % 360;
+      let angleDiff = targetAngle - currentBase;
+      if (angleDiff < 0) angleDiff += 360; // 常に時計回り
+      
+      currentRotation += (360 * extraSpins) + angleDiff;
+      document.getElementById('wheel').style.transform = `rotate(${currentRotation}deg)`;
+
+      // 中央の数字がパラパラ変わる演出
+      const centerEl = document.getElementById('wheel-center');
+      let rollInterval = setInterval(() => {
+        centerEl.innerText = order[Math.floor(Math.random() * 37)];
+      }, 50);
+
+      // アニメーション完了（4秒）を待つ
+      await new Promise(r => setTimeout(r, 4000));
+      clearInterval(rollInterval);
+
+      // 結果表示
+      centerEl.innerText = resultNum;
+      centerEl.style.color = (actualColor === 'red') ? '#c0392b' : (actualColor === 'black' ? '#34495e' : '#27ae60');
+
+      // 勝敗判定
+      let isWin = false;
+      if (actualColor === betColor && resultNum !== 0) {
+        isWin = true;
+      }
+
+      let colorText = (actualColor === 'red') ? '🔴 赤' : (actualColor === 'black' ? '⚫ 黒' : '🟢 緑(0)');
+      
+      if (isWin) {
+        let reward = betAmount * 2;
+        currentPoints += reward;
+        resultArea.innerHTML = `結果: 【${resultNum}】 ${colorText}<br><span style="color:#2ecc71;">大正解！ ${reward} もっち獲得！</span>`;
+      } else {
+        resultArea.innerHTML = `結果: 【${resultNum}】 ${colorText}<br><span style="color:#e74c3c;">残念、ハズレです...</span>`;
+      }
+
+      await fetch(GAS_URL, {
+        method: 'POST', body: JSON.stringify({ action: 'updatePoints', id: localStorage.getItem('userId'), newPoints: currentPoints }),
+        headers: { 'Content-Type': 'text/plain' }
+      });
+      updateDisplay();
+
+      // ロック解除
+      document.getElementById('btn-red').disabled = false;
+      document.getElementById('btn-black').disabled = false;
+    }
+
+    function updateDisplay() {
+      localStorage.setItem('userPoints', currentPoints);
+      document.getElementById('display-points').innerText = currentPoints;
+    }
+  </script>
+</body>
+</html>
