@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>スロット - もっちカジノ</title>
+  <style>
+    body { font-family: sans-serif; background-color: #2c3e50; color: white; text-align: center; padding: 20px; margin: 0; }
+    .container { max-width: 500px; margin: 0 auto; background: #34495e; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); width: 90%; }
+    .reels { display: flex; justify-content: center; gap: 10px; margin: 20px 0; }
+    .reel { width: 80px; height: 100px; background: white; color: black; font-size: 3em; display: flex; align-items: center; justify-content: center; border-radius: 10px; border: 5px solid #bdc3c7; }
+    .kakuhen { border-color: #f1c40f; box-shadow: 0 0 20px #f1c40f; animation: pulse 1s infinite alternate; }
+    @keyframes pulse { from { box-shadow: 0 0 10px #f1c40f; } to { box-shadow: 0 0 30px #e67e22; } }
+    button { padding: 15px 30px; font-size: 1.2em; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer; width: 80%; max-width: 300px; }
+    button:disabled { background: #7f8c8d; cursor: not-allowed; }
+    #msg { font-size: 1.2em; font-weight: bold; margin: 15px 0; color: #f1c40f; min-height: 1.5em; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🎰 スロット</h2>
+    <p>1プレイ: 100 もっち (固定)</p>
+    <p>所持金: <span id="display-points">---</span> もっち</p>
+    <p id="mode-text" style="color: #bdc3c7;">通常モード</p>
+
+    <div class="reels">
+      <div id="reel1" class="reel">🍒</div>
+      <div id="reel2" class="reel">🍒</div>
+      <div id="reel3" class="reel">🍒</div>
+    </div>
+
+    <div id="msg">スピンボタンを押してください</div>
+    <button id="btn-spin" onclick="spin()">スピン！ (100消費)</button>
+    <br><br><a href="../index.html" style="color:#bdc3c7;">🔙 マイページに戻る</a>
+  </div>
+
+  <script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyOmbY7H3r9MIDMsH4m7BifWwIknowmiE9nD44wXZVFrffQYOPr_OSvaejnyQvAdVtZNw/exec";
+    let currentPoints = parseInt(localStorage.getItem('userPoints'));
+    document.getElementById('display-points').innerText = currentPoints;
+
+    const symbols = ['🍒', '🔔', '🍉', '⭐', '7️⃣'];
+    let isKakuhen = false; // 確変フラグ
+    let spinIntervals = [];
+
+    async function spin() {
+      if (currentPoints < 100) { alert("もっちが足りません！"); return; }
+      currentPoints -= 100;
+      updateDisplay();
+
+      document.getElementById('btn-spin').disabled = true;
+      document.getElementById('msg').innerText = "回転中...";
+
+      const reels = [document.getElementById('reel1'), document.getElementById('reel2'), document.getElementById('reel3')];
+      
+      // 高速切り替えアニメーション
+      reels.forEach((reel, i) => {
+        spinIntervals[i] = setInterval(() => {
+          reel.innerText = symbols[Math.floor(Math.random() * symbols.length)];
+        }, 50);
+      });
+
+      // 停止処理
+      const results = [];
+      for (let i = 0; i < 3; i++) {
+        await new Promise(r => setTimeout(r, 800 + i * 500)); // 左から順に止まる
+        clearInterval(spinIntervals[i]);
+        
+        // 確変中は当たりやすくするロジック（7️⃣や⭐が出やすい）
+        let symbol;
+        if (isKakuhen && Math.random() > 0.3) {
+          symbol = (Math.random() > 0.5) ? '7️⃣' : '⭐';
+        } else {
+          symbol = symbols[Math.floor(Math.random() * symbols.length)];
+        }
+        
+        // 強制的に揃える演出（デモ用簡易ロジック）
+        if (i === 2 && isKakuhen && Math.random() > 0.5) symbol = results[0]; 
+
+        reels[i].innerText = symbol;
+        results.push(symbol);
+      }
+
+      judge(results);
+    }
+
+    async function judge(res) {
+      const msgEl = document.getElementById('msg');
+      let reward = 0;
+
+      if (res[0] === res[1] && res[1] === res[2]) {
+        if (res[0] === '7️⃣') { reward = 2000; msgEl.innerText = "🎉大当たり！2000もっち獲得！確変突入！"; isKakuhen = true; }
+        else if (res[0] === '⭐') { reward = 500; msgEl.innerText = "⭐中当たり！500もっち獲得！"; }
+        else { reward = 300; msgEl.innerText = "✨小当たり！300もっち獲得！"; }
+      } else {
+        msgEl.innerText = "ハズレ...";
+        if (isKakuhen && Math.random() > 0.7) {
+          isKakuhen = false; // 確率で確変終了
+          msgEl.innerText += " (確変終了)";
+        }
+      }
+
+      currentPoints += reward;
+      updateDisplay();
+      
+      // 確変演出の切り替え
+      document.getElementById('mode-text').innerText = isKakuhen ? "🔥確変モード🔥 (大チャンス！)" : "通常モード";
+      document.getElementById('mode-text').style.color = isKakuhen ? "#f1c40f" : "#bdc3c7";
+      document.querySelectorAll('.reel').forEach(r => isKakuhen ? r.classList.add('kakuhen') : r.classList.remove('kakuhen'));
+
+      document.getElementById('btn-spin').disabled = false;
+      
+      // GAS同期
+      await fetch(GAS_URL, {
+        method: 'POST', body: JSON.stringify({ action: 'updatePoints', id: localStorage.getItem('userId'), newPoints: currentPoints }),
+        headers: { 'Content-Type': 'text/plain' }
+      });
+    }
+
+    function updateDisplay() {
+      localStorage.setItem('userPoints', currentPoints);
+      document.getElementById('display-points').innerText = currentPoints;
+    }
+  </script>
+</body>
+</html>
