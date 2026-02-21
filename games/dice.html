@@ -3,117 +3,73 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>コイントス - もっちカジノ</title>
+  <title>サイコロ - もっちカジノ</title>
   <style>
-    body { font-family: sans-serif; background-color: #f4f7f6; color: #333; text-align: center; padding: 20px; margin: 0; }
-    .container { max-width: 500px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 90%; box-sizing: border-box; }
-    h2 { color: #2c3e50; }
-    .status-box { background: #fcf3cf; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+    /* CSSはコイントスと同様（省略して記載しますが、実際のファイルには反映させてください） */
+    body { font-family: sans-serif; background-color: #f4f7f6; text-align: center; padding: 20px; }
+    .container { max-width: 500px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
     .points { font-size: 1.5em; font-weight: bold; color: #e74c3c; }
-    
-    /* コインのアニメーション用 */
-    .coin-container { perspective: 1000px; margin: 30px auto; width: 100px; height: 100px; }
-    .coin { width: 100%; height: 100%; font-size: 5em; line-height: 100px; border-radius: 50%; background: #f1c40f; color: #d35400; box-shadow: inset 0 0 15px #e67e22, 0 5px 15px rgba(0,0,0,0.3); transition: transform 2s cubic-bezier(0.25, 0.1, 0.25, 1); transform-style: preserve-3d; display: flex; align-items: center; justify-content: center; }
-    
-    .bet-area { background: #ecf0f1; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
-    input[type="number"] { padding: 10px; font-size: 1.2em; width: 120px; text-align: right; border-radius: 5px; border: 1px solid #bdc3c7; }
-    .btn-omote { background-color: #e74c3c; color: white; border: none; padding: 15px 20px; cursor: pointer; border-radius: 5px; font-weight: bold; font-size: 1.1em; margin: 5px; width: 45%; }
-    .btn-ura { background-color: #3498db; color: white; border: none; padding: 15px 20px; cursor: pointer; border-radius: 5px; font-weight: bold; font-size: 1.1em; margin: 5px; width: 45%; }
-    button:disabled { background-color: #bdc3c7 !important; cursor: not-allowed; }
+    .btn-even { background-color: #2c3e50; color: white; padding: 15px 30px; border-radius: 5px; cursor: pointer; margin: 10px; font-weight: bold; }
+    .btn-odd { background-color: #e67e22; color: white; padding: 15px 30px; border-radius: 5px; cursor: pointer; margin: 10px; font-weight: bold; }
     #result-area { margin-top: 20px; padding: 15px; font-weight: bold; font-size: 1.2em; border-radius: 5px; display: none; }
+    button:disabled { background-color: #bdc3c7 !important; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>🪙 コイントス</h2>
-    
-    <div class="status-box">
-      <p style="margin: 0;">あなたの所持もっち</p>
-      <p class="points"><span id="display-points">---</span> もっち</p>
+    <h2>🎲 サイコロ (丁半)</h2>
+    <p>参加費: 200 もっち / 勝利報酬: 400 もっち</p>
+    <div style="background: #fcf3cf; padding: 10px; border-radius: 10px; margin-bottom: 20px;">
+      <p>所持金: <span id="display-points" class="points">---</span> もっち</p>
     </div>
 
-    <div class="bet-area">
-      賭け金: <input type="number" id="bet-amount" value="100" min="10" step="10"> もっち
-    </div>
-
-    <div class="coin-container">
-      <div id="coin" class="coin">？</div>
-    </div>
-
-    <div id="game-area">
-      <button id="btn-omote" class="btn-omote" onclick="playGame('表')">表に賭ける</button>
-      <button id="btn-ura" class="btn-ura" onclick="playGame('裏')">裏に賭ける</button>
-    </div>
+    <p>出目は「偶数」か「奇数」か？</p>
+    <button id="btn-even" class="btn-even" onclick="playGame('偶数')">偶数 (丁)</button>
+    <button id="btn-odd" class="btn-odd" onclick="playGame('奇数')">奇数 (半)</button>
 
     <div id="result-area"></div>
-
-    <br><a href="../index.html" style="color:#7f8c8d;">🔙 マイページに戻る</a>
+    <br><a href="../index.html">🔙 マイページに戻る</a>
   </div>
 
   <script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbyOmbY7H3r9MIDMsH4m7BifWwIknowmiE9nD44wXZVFrffQYOPr_OSvaejnyQvAdVtZNw/exec";
+    const COST = 200;
+    const REWARD = 400;
+
     let currentPoints = parseInt(localStorage.getItem('userPoints'));
     document.getElementById('display-points').innerText = currentPoints;
 
     async function playGame(bet) {
-      const betAmount = parseInt(document.getElementById('bet-amount').value);
-      if (betAmount < 10 || currentPoints < betAmount) { alert("賭け金が不正か、もっちが足りません！"); return; }
-
-      document.getElementById('btn-omote').disabled = true;
-      document.getElementById('btn-ura').disabled = true;
+      if (currentPoints < COST) { alert("もっちが足りません！"); return; }
       
-      const resultArea = document.getElementById('result-area');
-      resultArea.style.display = 'block';
-      resultArea.style.backgroundColor = '#ecf0f1';
-      resultArea.style.color = '#333';
-      resultArea.innerText = "コイントス中...";
+      document.getElementById('btn-even').disabled = true;
+      document.getElementById('btn-odd').disabled = true;
+      const resArea = document.getElementById('result-area');
+      resArea.style.display = 'block';
+      resArea.innerText = "サイコロを振っています...";
 
-      currentPoints -= betAmount;
-      updateDisplay();
-
-      // コイン回転アニメーション (ランダムな回転数を追加)
-      const coin = document.getElementById('coin');
-      const spins = Math.floor(Math.random() * 5) + 5; // 5〜9回転
-      const isOmoteResult = Math.random() < 0.5;
-      const extraDegrees = isOmoteResult ? 0 : 180; 
-      const totalRotation = (spins * 360) + extraDegrees;
+      const dice = Math.floor(Math.random() * 6) + 1;
+      const result = (dice % 2 === 0) ? '偶数' : '奇数';
       
-      coin.style.transform = `rotateY(${totalRotation}deg)`;
+      currentPoints -= COST;
+      const isWin = (bet === result);
+      if (isWin) currentPoints += REWARD;
+
+      try {
+        await fetch(GAS_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'updatePoints', id: localStorage.getItem('userId'), newPoints: currentPoints }),
+          headers: { 'Content-Type': 'text/plain' }
+        });
+        
+        localStorage.setItem('userPoints', currentPoints);
+        document.getElementById('display-points').innerText = currentPoints;
+        resArea.innerText = `出目は「${dice}」(${result})！\n${isWin ? '当たり！ +200もっち' : 'ハズレ...'}`;
+        resArea.style.backgroundColor = isWin ? '#d5f5e3' : '#fadbd8';
+      } catch (e) { alert("通信失敗"); }
       
-      // アニメーションが終わるまで待機（2秒）
-      await new Promise(r => setTimeout(r, 2000));
-
-      const result = isOmoteResult ? '表' : '裏';
-      coin.innerText = result;
-      coin.style.color = isOmoteResult ? '#e74c3c' : '#3498db';
-
-      let isWin = (bet === result);
-      let reward = isWin ? betAmount * 2 : 0;
-      currentPoints += reward;
-
-      if (isWin) {
-        resultArea.style.backgroundColor = '#d5f5e3';
-        resultArea.style.color = '#27ae60';
-        resultArea.innerText = `大正解！ ${reward} もっち獲得！`;
-      } else {
-        resultArea.style.backgroundColor = '#fadbd8';
-        resultArea.style.color = '#c0392b';
-        resultArea.innerText = `残念、ハズレです。`;
-      }
-
-      await fetch(GAS_URL, {
-        method: 'POST', body: JSON.stringify({ action: 'updatePoints', id: localStorage.getItem('userId'), newPoints: currentPoints }),
-        headers: { 'Content-Type': 'text/plain' }
-      });
-      updateDisplay();
-
-      document.getElementById('btn-omote').disabled = false;
-      document.getElementById('btn-ura').disabled = false;
-    }
-
-    function updateDisplay() {
-      localStorage.setItem('userPoints', currentPoints);
-      document.getElementById('display-points').innerText = currentPoints;
+      document.getElementById('btn-even').disabled = false;
+      document.getElementById('btn-odd').disabled = false;
     }
   </script>
 </body>
